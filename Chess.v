@@ -51,7 +51,7 @@ module Chess(
 			end
 			
 			for (i = 1; i <= 8; i = i + 1) begin
-				board[i + 6 * 8) = 5'd7;
+				board[i + 48] = 5'd7;
 			end
 			
 			board[56] = 5'd8;
@@ -127,7 +127,7 @@ module Chess(
 		end
 	endtask
 
-		task canReachDiagonally
+	task canReachDiagonally
 		input currSquare;
 		input targetSquare;
 		output reg [11:0] board[63:0];
@@ -178,7 +178,7 @@ module Chess(
 
 		end
 	endtask
-
+	
 	// unlike other pieces, knight doesn't need line of sight; logic is unique
 	task canReachL
 		input currSquare;
@@ -214,7 +214,6 @@ module Chess(
 		end
 	endtask
 	
-	
 	always @(posedge clock) begin
 			if (select)
 		
@@ -226,7 +225,6 @@ task computePinnedPieces(
 endtask
 
 /*
-	Moving in chess is the most difficult task (besides solving it)
 	I differentiate "possible" from "legal" because computing "legal" entails:
 		- Making sure the piece isn't pinned
 		- Making sure the king isn't in check
