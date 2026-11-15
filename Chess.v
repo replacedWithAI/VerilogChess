@@ -179,9 +179,39 @@ module Chess(
 		end
 	endtask
 
-	task computeKnightMove(
-	);
+	// unlike other pieces, knight doesn't need line of sight; logic is unique
+	task canReachL
+		input currSquare;
+		input targetSquare;
+		output reg [11:0] board[63:0];
+		output canReach;
 		
+		begin : tryReach
+			reg[2:0] currSquareRow = currSquare % 8;
+			reg[2:0] currSquareColumn = currSquare / 8;
+			reg[2:0] targetSquareRow = targetSquare % 8;
+			reg[2:0] targetSquareColumn = targetSquare / 8;
+			
+			if (currSquareRow - targetSquareRow % 2 == 0) begin
+				if (targetSquareColumn - currSquareColumn == 1 || targetSquareColumn - currSquareColumn == -1) begin
+					canReach =  1'd1;
+					board[targetSquare] = board[currSquare];
+					board[currSquare] = 0;
+					disable tryReach;
+				end
+			end
+					
+			else if (targetSquareColumn - currSquareColumn % 2 == 0) begin 
+				if (currSquareRow - targetSquareRow == 1 || currSquareRow - targetSquareRow == -1) begin
+					canReach =  1'd1;
+					board[targetSquare] = board[currSquare];
+					board[currSquare] = 0;
+					disable tryReach;
+				end
+			end
+		
+			canReach =  1'd0;
+		end
 	endtask
 	
 	
