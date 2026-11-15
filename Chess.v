@@ -127,11 +127,11 @@ module Chess(
 		end
 	endtask
 
-	task canReachDiagonally
+		task canReachDiagonally
 		input currSquare;
 		input targetSquare;
 		output reg [11:0] board[63:0];
-		output canReach;
+		output reg canReach;
 		
 		begin : tryReach
 			
@@ -144,8 +144,8 @@ module Chess(
 			if (currSquare - targetSquare % 9 == 0) begin
 				
 				reg[6:0] i;
-				reg signed [4:0] traversal = targetSquareRow < currSquareColumn ? 9 ; -9;				
-				for (i = currSquareRow + traversal; i != targetSquareRow; i = i+traversal) begin
+				reg signed [4:0] traversal = currSquare < targetSquare ? 9 ; -9;				
+				for (i = currSquareRow + traversal; i != targetSquare; i = i+traversal) begin
 					if (board[i] != 0) begin
 						canReach = 1'd0;
 						disable tryReach;
