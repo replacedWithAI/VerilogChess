@@ -25,17 +25,17 @@ module Chess(
 			2: white rook
 			3: white knight
 			4: white bishop:
-			5: white king
-			6: white queen:
+			5: white queen
+			6: white king:
 			7-12: black pawn to black queen
 			
 		also, a1 = 0, b1 = 1, and so on so forth across the row, then
 		a2 = 9, b2 = 9. Right and up until h8 = 63
 	*/
 	task initialiseBoard;
-		input reset,
-		input clock,
-		output reg [11:0] board[63:0]
+		input reset;
+		input clock;
+		output reg [4:0] board[63:0];
 		
 		begin
 			board[0] = 5'd2;
@@ -47,11 +47,11 @@ module Chess(
 			board[6] = 5'd3;
 			board[7] = 5'd2;
 			
-			for (i = 1; i <= 8; i = i + 1) begin
+			for (i = 0; i < 7; i = i + 1) begin
 				board[i + 8] = 5'd1;
 			end
 			
-			for (i = 1; i <= 8; i = i + 1) begin
+			for (i = 0; i < 7; i = i + 1) begin
 				board[i + 48] = 5'd7;
 			end
 			
@@ -64,21 +64,21 @@ module Chess(
 			board[62] = 5'd9;
 			board[63] = 5'd8;
 					
-			for (i = 2; i < 7; i = i + 1) begin
+			for (i = 2; i < 6; i = i + 1) begin
 				for (j = 0; j < 8; j = j + 1) begin
 					board[i * 8 + j] = 5'd0;
 				end
 			end
 		end
-	endtask;
+	endtask
 	
 
 	task clearReachableSqaures;
-		output reg reach[63:0];
-		begin;
+		output reg reachable[63:0];
+		begin
 			reg[7:0] i;
 			for (i = 0; i < 64; i = i+1)
-				reach[i] = 2'b0;
+				reachable[i] = 1'b0;
 		end
 	endtask
 
@@ -88,22 +88,22 @@ module Chess(
 		input signed [5:0] rowDirection;
 		input signed [5:0] columnDirection;
 		input[4:0] board [63:0];
-		output reg reachable[63:0];
-		begin
-			reg signed [5:0] currSquareRow; // board dimensions are always positive, but the code might enter negatives
-			reg signed [5:0] currSquareColumn;
-			reg isWhite;
-			reg blocked; // 1 if true, 0 if false
+		inout reg reachable[63:0];
 
+		reg signed [5:0] currSquareRow; // board dimensions are always positive, but the code might enter negatives
+		reg signed [5:0] currSquareColumn;
+		reg isWhite;
+		reg blocked; // 1 if true, 0 if false
+		reg signed[4:0] i;
+		reg signed[4:0] nextRow;
+		reg signed[4:0] nextColumn;
+		reg signed[7:0] nextSquare;
+
+		begin
 			currSquareColumn = currSqure / 8;
 			currSquareRow = currSquare % 8;
 			isWhite = (board[currSquare] <= 5'd6);
 			blocked = 1'b0;
-
-			reg signed[4:0] i;
-			reg signed[4:0] nextRow;
-			reg signed[4:0] nextColumn;
-			reg signed[7:0] nextSquare;
 
 			for (i = 1; i < 8; i = i + 1) begin
 				nextRow = currSquareRow + i * rowDirection;
@@ -112,12 +112,12 @@ module Chess(
 				if (!blocked && nextRow >= 0 && nextRow < 8 && nextColumn >= 0 && nextColumn < 8) begin
 					nextSquare = nextColumn * 8 + nextRow;
 
-					if (board[nextSquare] == 5'd0) reachable = 1'b1;
-					else if ((board[nextSquare] <= 5'd6) != isWhite) begin
-						blocked = 1'b0;
-						reachable[nextSquare] = 1'b1;
+					if (board[nextSquare] == 5'd0) reachable[nextSquare] = 1'b1;
+					else begin
+						if ((board[nextSquare] <= 5'd6) != isWhite)
+							reachable[nextSquare] = 1'b1;
+						blocked = 1'b1;
 					end
-
 				end
 			end
 		end
@@ -157,49 +157,51 @@ module Chess(
 		input reg [4:0] board[63:0];
 		output reg reachable[63:0];
 		
+		reg signed [8:0] nextSquare;
+
 		begin
 			reg signed[3:0] currSquareRow = currSquare % 8;
 			reg signed[3:0] currSquareColumn = currSquare / 8;
-			reg signed [8:0] nextSquare;
+			reg isWhite = (board[currSquare] <= 6);
 
 			nextSquare = currSquare + 10;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
-				nextSquare / 8 - currSquareColumn == 1)
+				nextSquare / 8 - currSquareColumn == 1 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare + 17;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
-				nextSquare / 8 - currSquareColumn == 2)
+				nextSquare / 8 - currSquareColumn == 2 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare + 15;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
-				nextSquare / 8 - currSquareColumn == 2)
+				nextSquare / 8 - currSquareColumn == 2 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare + 6;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
-				nextSquare / 8 - currSquareColumn == 1)
+				nextSquare / 8 - currSquareColumn == 1 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare - 10;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
-				nextSquare / 8 - currSquareColumn == -1)
+				nextSquare / 8 - currSquareColumn == -1 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare - 17;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
-				nextSquare / 8 - currSquareColumn == -2)
+				nextSquare / 8 - currSquareColumn == -2 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare - 15;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
-				nextSquare / 8 - currSquareColumn == -2)
+				nextSquare / 8 - currSquareColumn == -2 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 
 			nextSquare = currSquare - 6;
 			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
-				nextSquare / 8 - currSquareColumn == -1)
+				nextSquare / 8 - currSquareColumn == -1 && (board[nextSquare] <= 5'd6) != isWhite)
 				reachable[nextSquare] = 1'b1;
 		end
 	endtask
