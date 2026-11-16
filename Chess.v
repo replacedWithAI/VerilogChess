@@ -17,6 +17,7 @@ module Chess(
 	reg [2:0] row;
 	reg [2:0] column;
 	
+
 	/*
 		for each square in the 64 area board, the values for each square mean:
 			0: empty
@@ -31,7 +32,7 @@ module Chess(
 		also, a1 = 0, b1 = 1, and so on so forth across the row, then
 		a2 = 9, b2 = 9. Right and up until h8 = 63
 	*/
-	task initialiseBoard
+	task initialiseBoard;
 		input reset,
 		input clock,
 		output reg [11:0] board[63:0]
@@ -71,146 +72,135 @@ module Chess(
 		end
 	endtask;
 	
-	task canReachVerticallyHorizontally
-		input currSquare;
-		input targetSquare;
-		output board [11:0] board[63:0];
-		output canReach;
-		
-		begin : tryReach
-			reg[2:0] currSquareRow = currSquare % 8;
-			reg[2:0] currSquareColumn = currSquare / 8;
-			reg[2:0] targetSquareRow = targetSquare % 8;
-			reg[2:0] targetSquareColumn = targetSquare / 8;
-			
-			if (targetSquare > 63 || targetSquare < 0) begin
-				canReach = 1'd0;
-				disable tryReach;
-			end
-			
-			// moving vertically
-			if (currSquareRow != targetSquareRow && currSquareColumn == targetSquareColumn) begin
-				
-				reg[6:0] i;
-				reg signed [1:0] traversal = targetSquareRow < currSquareColumn ? 1 ; -1;				
-				for (i = currSquareRow + traversal; i != targetSquareRow; i = i+traversal) begin
-					if (board[i] != 0) begin // this piece type can't move through allies or enemies
-						canReach = 1'd0;
-						disable tryReach;
-					end
-				end
-				
-				canReach =  1'd1;
-				board[targetSquare] = board[currSquare];
-				board[currSquare] = 0;
-			end
-			
-			// moving horizontally
-			else if (currSquareRow == targetSquareRow && currSquareColumn != targetSquareColumn) begin
-			
-				reg[6:0] i;
-				reg signed [1:0] traversal = targetSquareRow < currSquareColumn ? 8 ; -8;
-				for (i = currSquareRow + traversal; i != targetSquareRow; i = i+traversal) begin
-					if (board[i] != 0) begin
-						canReach = 1'd0;
-						disable tryReach;
-					end
-				end
-				
-				canReach =  1'd1;
-				board[targetSquare] = board[currSquare];
-				board[currSquare] = 0;
-			end
-			
-			else canReach =  1'd0;
 
+	task clearReachableSqaures;
+		output reg reach[63:0];
+		begin;
+			reg[7:0] i;
+			for (i = 0; i < 64; i = i+1)
+				reach[i] = 2'b0;
 		end
 	endtask
 
-	task canReachDiagonally
-		input currSquare;
-		input targetSquare;
-		output reg [11:0] board[63:0];
-		output reg canReach;
-		
-		begin : tryReach
-			
-			if (targetSquare > 63 || targetSquare < 0) begin
-				canReach = 1'd0;
-				disable tryReach;
-			end
-			
-			// forward slash
-			if (currSquare - targetSquare % 9 == 0) begin
-				
-				reg[6:0] i;
-				reg signed [4:0] traversal = currSquare < targetSquare ? 9 ; -9;				
-				for (i = currSquareRow + traversal; i != targetSquare; i = i+traversal) begin
-					if (board[i] != 0) begin
-						canReach = 1'd0;
-						disable tryReach;
-					end
-				end
-				
-				canReach =  1'd1;
-				board[targetSquare] = board[currSquare];
-				board[currSquare] = 0;
-			end
-			
-			// back slash
-			else if (currSquareRow - targetSquare % 7 == 0) begin
-			
-				reg[6:0] i;
-				reg signed [3:0] traversal = targetSquareRow < currSquareColumn ? 7 ; -7;
-				for (i = currSquareRow + traversal; i != targetSquareRow; i = i+traversal) begin
-					if (board[i] != 0) begin 
-						canReach = 1'd0;
-						disable tryReach;
-					end
-				end
-				
-				canReach =  1'd1;
-				board[targetSquare] = board[currSquare];
-				board[currSquare] = 0;
-			end
-			
-			else canReach =  1'd0;
 
+	task computeSlidingReachableSqaures;
+		input reg [6:0] currSquare;
+		input signed [5:0] rowDirection;
+		input signed [5:0] columnDirection;
+		input[4:0] board [63:0];
+		output reg reachable[63:0];
+		begin
+			reg signed [5:0] currSquareRow; // board dimensions are always positive, but the code might enter negatives
+			reg signed [5:0] currSquareColumn;
+			reg isWhite;
+			reg blocked; // 1 if true, 0 if false
+
+			currSquareColumn = currSqure / 8;
+			currSquareRow = currSquare % 8;
+			isWhite = (board[currSquare] <= 5'd6);
+			blocked = 1'b0;
+
+			reg signed[4:0] i;
+			reg signed[4:0] nextRow;
+			reg signed[4:0] nextColumn;
+			reg signed[7:0] nextSquare;
+
+			for (i = 1; i < 8; i = i + 1) begin
+				nextRow = currSquareRow + i * rowDirection;
+				nextColumn = currSquareColumn + i * columnDirection;
+
+				if (!blocked && nextRow >= 0 && nextRow < 8 && nextColumn >= 0 && nextColumn < 8) begin
+					nextSquare = nextColumn * 8 + nextRow;
+
+					if (board[nextSquare] == 5'd0) reachable = 1'b1;
+					else if ((board[nextSquare] <= 5'd6) != isWhite) begin
+						blocked = 1'b0;
+						reachable[nextSquare] = 1'b1;
+					end
+
+				end
+			end
+		end
+	endtask
+
+
+	task canReachVerticallyHorizontally;
+		input [6:0] currSquare;
+		input board [4:0] board[63:0];
+		output reg reachable[63:0];
+		
+		begin
+			computeSlidingReachableSqaures(startSquare, 1, 0, board, reachable);
+			computeSlidingReachableSqaures(startSquare, 0, 1, board, reachable);
+			computeSlidingReachableSqaures(startSquare, -1, 0, board, reachable);
+			computeSlidingReachableSqaures(startSquare, 0, -1, board, reachable);
+		end
+	endtask
+
+	task canReachDiagonally;
+		input [6:0] currSquare;
+		input board [4:0] board[63:0];
+		output reg reachable[63:0];
+		
+		begin
+			computeSlidingReachableSqaures(startSquare, 1, 1, board, reachable);
+			computeSlidingReachableSqaures(startSquare, 1, -1, board, reachable);
+			computeSlidingReachableSqaures(startSquare, -1, 1, board, reachable);
+			computeSlidingReachableSqaures(startSquare, -1, -1, board, reachable);
 		end
 	endtask
 	
-	// unlike other pieces, knight doesn't need line of sight; logic is unique
-	task canReachL
-		input currSquare;
-		input targetSquare;
-		output reg [11:0] board[63:0];
-		output canReach;
+	// unlike other pieces, knight doesn't slide or need line of sight; logic is unique
+	// I also don't know how to do this besides manually checking every possibility
+	task canReachL;
+		input reg [6:0] currSquare;
+		input reg [4:0] board[63:0];
+		output reg reachable[63:0];
 		
-		begin : tryReach
-			reg[2:0] currSquareRow = currSquare % 8;
-			reg[2:0] currSquareColumn = currSquare / 8;
-			reg[2:0] targetSquareRow = targetSquare % 8;
-			reg[2:0] targetSquareColumn = targetSquare / 8;
-			
-			if (currSquareRow - targetSquareRow % 2 == 0) begin
-				if (targetSquareColumn - currSquareColumn == 1 || targetSquareColumn - currSquareColumn == -1) begin
-					canReach =  1'd1;
-					board[targetSquare] = board[currSquare];
-					board[currSquare] = 0;
-					disable tryReach;
-				end
-			end
-					
-			else if (targetSquareColumn - currSquareColumn % 2 == 0) begin 
-				if (currSquareRow - targetSquareRow == 1 || currSquareRow - targetSquareRow == -1) begin
-					canReach =  1'd1;
-					board[targetSquare] = board[currSquare];
-					board[currSquare] = 0;
-					disable tryReach;
-				end
-			end
-		
-			canReach =  1'd0;
+		begin
+			reg signed[3:0] currSquareRow = currSquare % 8;
+			reg signed[3:0] currSquareColumn = currSquare / 8;
+			reg signed [8:0] nextSquare;
+
+			nextSquare = currSquare + 10;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
+				nextSquare / 8 - currSquareColumn == 1)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare + 17;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
+				nextSquare / 8 - currSquareColumn == 2)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare + 15;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
+				nextSquare / 8 - currSquareColumn == 2)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare + 6;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
+				nextSquare / 8 - currSquareColumn == 1)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare - 10;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
+				nextSquare / 8 - currSquareColumn == -1)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare - 17;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
+				nextSquare / 8 - currSquareColumn == -2)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare - 15;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
+				nextSquare / 8 - currSquareColumn == -2)
+				reachable[nextSquare] = 1'b1;
+
+			nextSquare = currSquare - 6;
+			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
+				nextSquare / 8 - currSquareColumn == -1)
+				reachable[nextSquare] = 1'b1;
 		end
 	endtask
 	
