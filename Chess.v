@@ -73,7 +73,7 @@ module Chess(
 	endtask
 	
 
-	task clearReachableSqaures;
+	task clearReachableSquares;
 		output reg reachable[63:0];
 		begin
 			reg[7:0] i;
@@ -83,7 +83,7 @@ module Chess(
 	endtask
 
 
-	task computeSlidingReachableSqaures;
+	task computeSlidingReachableSquares;
 		input reg [6:0] currSquare;
 		input signed [5:0] rowDirection;
 		input signed [5:0] columnDirection;
@@ -130,10 +130,10 @@ module Chess(
 		output reg reachable[63:0];
 		
 		begin
-			computeSlidingReachableSqaures(startSquare, 1, 0, board, reachable);
-			computeSlidingReachableSqaures(startSquare, 0, 1, board, reachable);
-			computeSlidingReachableSqaures(startSquare, -1, 0, board, reachable);
-			computeSlidingReachableSqaures(startSquare, 0, -1, board, reachable);
+			computeSlidingReachableSquares(startSquare, 1, 0, board, reachable);
+			computeSlidingReachableSquares(startSquare, 0, 1, board, reachable);
+			computeSlidingReachableSquares(startSquare, -1, 0, board, reachable);
+			computeSlidingReachableSquares(startSquare, 0, -1, board, reachable);
 		end
 	endtask
 
@@ -143,10 +143,10 @@ module Chess(
 		output reg reachable[63:0];
 		
 		begin
-			computeSlidingReachableSqaures(startSquare, 1, 1, board, reachable);
-			computeSlidingReachableSqaures(startSquare, 1, -1, board, reachable);
-			computeSlidingReachableSqaures(startSquare, -1, 1, board, reachable);
-			computeSlidingReachableSqaures(startSquare, -1, -1, board, reachable);
+			computeSlidingReachableSquares(startSquare, 1, 1, board, reachable);
+			computeSlidingReachableSquares(startSquare, 1, -1, board, reachable);
+			computeSlidingReachableSquares(startSquare, -1, 1, board, reachable);
+			computeSlidingReachableSquares(startSquare, -1, -1, board, reachable);
 		end
 	endtask
 	
