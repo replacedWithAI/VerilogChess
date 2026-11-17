@@ -72,7 +72,7 @@ module Chess(
 	endtask
 	
 	// -----------------------------------------------------------------------------------------------------------------
-	// compute squares that pieces can reach, assuming their king isn't checked
+	// compute squares that pieces can reach. Does not mean the move is "legal" though
 
 	function isInsideBoard;
 		input reg signed [5:0] boardDimension;
@@ -160,6 +160,7 @@ module Chess(
 		end
 	endtask
 
+
 	task canReachDiagonally;
 		input [6:0] currSquare;
 		output reg [63:0] reachable;
@@ -171,8 +172,8 @@ module Chess(
 			computeSlidingReachableSquares(startSquare, -1, -1, board, reachable);
 		end
 	endtask
-	
-	// I don't know how to do this besides manually checking every possibility
+
+
 	task knightCanReach;
 		input reg [6:0] currSquare;
 		output reg [63:0] reachable;
@@ -279,6 +280,127 @@ module Chess(
 			end
 		end
 	endtask
+
+
+	task getPieceByFixedOffset;
+		input[5:0] currSquare;
+		input signed [5:0] rowDirection;
+		input signed [5:0] columnDirection;
+		input reg [4:0] attackingPieceType;
+		output reg isAttacked;
+
+		reg signed [4:0] nextRow;
+		reg signed [4:0] nextColumn;
+		
+		begin
+			nextRow = currSquare % 8 + rowDirection;
+			nextColumn = currSquare / 8 + columnDirection;
+
+			if (isInsideBoard(nextRow) && isInsideBoard(nextColumn) && board[nextColumn * 8 + nextRow] == attackingPieceType)
+				isAttacked = 1'b1;
+		end
+	endtask
+
+
+	task findKing;
+		input isBlackTurn;
+		output reg[5:0] kingSquare;
+		output reg kingFound;
+
+		reg [6:0] i;
+		reg [4:0] kingPiece;
+
+		begin
+			kingFound = 1'b0;
+			kingPiece = 5'd6 - isBlackTurn * 6;
+			for (i = 0; i < 64; i = i + 1) begin
+				if (board[i] == kingPiece)
+					kingSquare = i;
+					kingFound = 1'b1;
+			end
+		end
+	endtask
+
+
+	task isChecked;
+		input isBlackTurn;
+		output reg checked;
+		
+		reg [5:0] kingSquare;
+		reg [4:0] attackingPieceType;
+		reg found;
+		reg signed [2:0] i;
+		reg signed [2:0] j;
+		reg signed [1:0] k;
+		reg signed [1:0] pawnDirection;
+
+		begin : checked
+			checked = 1'b0;
+			
+			findKing(!isBlackTurn, kingSquare, found);
+			if (!found) disable checked;
+
+			for (i = -1; i <= 1; i = i + 1) begin // queen, bishop, rook attack
+				for (j = -1; j <= 1; j = j + 1) begin
+
+				if (i != 1'b0 && j != 1'b0)
+					getFirstPieceInDirection(kingSquare, i, j, isBlackTurn, checked);
+
+				end
+			end
+
+			i = 3'b0;
+			j = -3'd1;
+			attackingPieceType = isBlackTurn ? 5'd3 : 5'd9;
+
+			for (i = 1; i <= 2; i = i + 1) begin // knight attack
+				for (k = -1; k <= 1; k = k + 2) begin
+					
+					getPieceByFixedOffset(kingSquare, i * k, (i + 1) * j, attackingPieceType, checked);
+					j = -j;
+
+				end
+			end
+
+			i = 3'b0;
+			j = 3'd0;
+			attackingPieceType = isBlackTurn ? 5'd6 : 5'd12;
+
+			// pretty unintuitive because this checks if a king is adjacent to an enemy king, obviously illegal
+			// but this task checks if the king's square is safe, ignoring how it got there. So this is necessary
+			for (i = -1; i <= 1; i = i + 1) begin 
+				for (j = -1; j <= 1; j = j + 1) begin
+
+				if (i != 1'b0 && j != 1'b0)
+					getPieceByFixedOffset(kingSquare, i, j, attackingPieceType, checked);
+
+				end
+			end
+
+			pawnDirection = isBlackTurn ? -1 : 1; // the opposite direction enemy pawns can move
+			attackingPieceType = isBlackTurn ? 5'd1 : 5'd7;
+			getPieceByFixedOffset(kingSquare, 1, pawnDirection, attackingPieceType, checked);
+			getPieceByFixedOffset(kingSquare, -1, pawnDirection, attackingPieceType, checked);
+		end
+	endtask
+
+	// -----------------------------------------------------------------------------------------------------------------
+	// legal moves logic
+
+	task doesKingStaySafe;
+		input[5:0] currSquare;
+		input[5:0] targetSquare;
+		output reg isSafe;
+
+		reg [4:0] movedPiece;
+		reg [4:0] capturedPiece;
+		reg isWhite;
+		reg isChecked;
+
+		begin
+			movedPiece = board[currSquare];
+			capturedPiece = board[targetSquare];
+			isWhite = (capturedPiece >= 5'd1 && capturedPiece <= 5'd6);
 
 
 
