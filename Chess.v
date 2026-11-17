@@ -71,6 +71,9 @@ module Chess(
 		end
 	endtask
 	
+	// -----------------------------------------------------------------------------------------------------------------
+	// compute squares that pieces can reach, assuming their king isn't checked
+
 	function isInsideBoard;
 		input reg signed [5:0] boardDimension;
 		begin
@@ -231,6 +234,54 @@ module Chess(
 			end
 		end
 	endtask
+
+	// -----------------------------------------------------------------------------------------------------------------
+	// isCheck logic
+	
+	task getFirstPieceInDirection;
+		input[5:0] currSquare;
+		input signed [5:0] rowDirection;
+		input signed [5:0] columnDirection;
+		input isBlackTurn;
+		inout reg isAttacked;
+
+		reg signed [4:0] i;
+		reg signed [4:0] currRow;
+		reg signed [4:0] currColumn;
+		reg signed [4:0] nextRow;
+		reg signed [4:0] nextColumn;
+		reg [4:0] piece;
+		reg [5:0] pieceSquare;
+		reg [4:0] pieceType;
+		reg isDiagonal;
+
+		begin
+			currRow = currSquare % 8;
+			currColumn = currColumn / 8;
+			piece = 5'd0;
+
+			for (i = 1; i < 8; i = i + 1) begin
+				nextRow = currRow + i * rowDirection;
+				nextColumn = currColumn + i * columnDirection;
+
+				if (piece == 5'd0 && isInsideBoard(nextRow) && isInsideBoard(nextColumn) && board[nextColumn * 8 + nextRow] != 5'd0)
+					begin
+					piece = board[nextColumn * 8 + nextRow];
+					pieceSquare = nextColumn * 8 + nextRow;
+				end
+			end
+
+			if (piece != 5'd0 && (piece >= 5'd1 && piece <= 5'd6) == isBlackTurn) begin
+				pieceType = pieceType - isBlackTurn * 6;
+				isDiagonal = (rowDirection != 0 && columnDirection != 0);
+				if (pieceType == 5'd5 || (isDiagonal ? pieceType == 5'd4 : pieceType == 5'd2)) 
+					isAttacked = 1'b1;
+			end
+		end
+	endtask
+
+
+
 
 	always @(posedge clock) begin
 			if (select)
