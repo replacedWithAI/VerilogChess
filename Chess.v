@@ -236,6 +236,31 @@ module Chess(
 		end
 	endtask
 
+
+	task computeReachableSquares;
+		input[5:0] currSquare;
+		output reg [63:0] reachable;
+
+		reg [4:0] pieceType;
+
+		begin
+			reachable = 64'd0;
+			pieceType = board[currSquare] > 5'd6 ? board[currSquare] - 5'd6 : board[currSquare];
+
+			case(pieceType)
+				5'd1: pawnCanReach(currSquare, reachable);
+				5'd2: canReachVerticallyHorizontally(currSquare, reachable);
+				5'd3: knightCanReach(currSquare, reachable);
+				5'd4: canReachDiagonally(currSquare, reachable);
+				5'd5: begin	
+					canReachVerticallyHorizontally(currSquare, reachable);
+					canReachDiagonally(currSquare, reachable);
+				end
+				default: ;
+			endcase
+		end
+	endtask
+
 	// -----------------------------------------------------------------------------------------------------------------
 	// isCheck logic
 	
@@ -321,7 +346,7 @@ module Chess(
 		end
 	endtask
 
-
+	// brute force check all squares that attackers can reach the king square
 	task isChecked;
 		input isBlackTurn;
 		output reg checked;
@@ -386,11 +411,12 @@ module Chess(
 
 	// -----------------------------------------------------------------------------------------------------------------
 	// legal moves logic
-
+	
+	// checks if a move, if allowed, exposes or doesn't defend a checked king
 	task doesKingStaySafe;
 		input[5:0] currSquare;
 		input[5:0] targetSquare;
-		output reg isSafe;
+		output reg isSafeMove;
 
 		reg [4:0] movedPiece;
 		reg [4:0] capturedPiece;
@@ -400,11 +426,110 @@ module Chess(
 		begin
 			movedPiece = board[currSquare];
 			capturedPiece = board[targetSquare];
-			isWhite = (capturedPiece >= 5'd1 && capturedPiece <= 5'd6);
+			isWhite = (movedPiece >= 5'd1 && movedPiece <= 5'd6);
+
+			board[targetSquare] = board[currSquare];
+			board[currSquare] = 5'd0;
+			isChecked(!isWhite, isSafeMove);
+
+			board[currSquare] = movedPiece;
+			board[targetSquare] = capturedPiece;
+		end
+	endtask
 
 
+	task computeLegalMoves;
+		input [5:0] currSquare;
+		output reg[63:0] legalMoves;
 
+		reg[63:0] reachable;
+		reg[6:0] i;
+		reg isSafeMove;
 
+		begin
+			computeReachableSquares(currSquare, reachable);
+			legalMoves = 64'b0;
+
+			for (i = 0; i < 64; i = i + 1) begin
+				
+				if(reachable[i]) begin
+					doesKingStaySafe(currSquare, i, isSafeMove);
+					legalMoves[i] = isSafeMove;
+				end
+			
+			end
+		end
+	endtask
+
+	// -----------------------------------------------------------------------------------------------------------------
+	// checkmate and stalemate logic
+
+	task hasLegalMoves
+		input isBlackMove;
+		output reg hasAnyLegal;
+
+		reg[6:0] i;
+		reg [63:0] legalMoves;
+
+		begin : checkForMoves
+			hasAnyLegal = 1'b0;
+
+			for (i = 0; i < 64; i = i + 1) begin
+
+				if (board[i] != 5'd0 && (board[i] >= 5'd7 && board[i] <= 5'd12) == isBlackMove) begin
+					commputeLegalMoves(i, legalMoves);
+
+					if (legalMoves != 64'b0) begin
+						hasAnyLegal = 1'b1;
+						disable checkForMoves;
+					end
+					
+				end
+
+			end
+		end
+	endtask
+
+	task isCheckmate
+		input isBlackMove;
+		output reg checkmate;
+
+		reg inCheck;
+		reg hasAnyLegal;
+
+		begin
+			checkmate = 1'b0;
+
+			isChecked(isBlackMove, inCheck);
+			if (isChecked) begin
+				hasLegalMoves(isBlackMove, hasAnyLegal);
+				checkmate = !hasAnyLegal;
+			end
+		
+		end
+	endtask
+
+	task isStalemate
+		input isBlackMove;
+		output reg stalemate;
+
+		reg inCheck;
+		reg hasAnyLegal;
+
+		begin
+			stalemate = 1'b0;
+			
+			isChecked(isBlackMove, inCheck);
+			if (!isChecked) begin
+				hasLegalMoves(isBlackMove, hasAnyLegal);
+				checkmate = !hasAnyLegal;
+			end
+
+		end
+	endtask
+
+	// -----------------------------------------------------------------------------------------------------------------
+	
 	always @(posedge clock) begin
 			if (select)
 		
