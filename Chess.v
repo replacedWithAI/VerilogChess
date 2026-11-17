@@ -4,19 +4,12 @@ endmodule
 
 
 module Chess(
-	input [5:0] SW,
+	input [6:0] SW,
 	input clock,
 	input reset,
-	input select,
-	output [6:0] HEX5,
-	output [6:0] HEX3,
-	output [6:0] HEX1,
-	output [6:0] HEX0
+	input select
 );
 	reg [4:0] chessBoard[63:0];
-	reg [2:0] row;
-	reg [2:0] column;
-	
 
 	/*
 		for each square in the 64 area board, the values for each square mean:
@@ -33,9 +26,6 @@ module Chess(
 		a2 = 9, b2 = 9. Right and up until h8 = 63
 	*/
 	task initialiseBoard;
-		input reset;
-		input clock;
-		
 		begin
 			board[0] = 5'd2;
 			board[1] = 5'd3;
@@ -92,9 +82,9 @@ module Chess(
 
 
 	task canLandOnSquare;
-		input[5:0] currSquare;
-		input signed [4:0] relativeNextRow;
-		input signed [4:0] relativeNextColumn;
+		input reg [5:0] currSquare;
+		input reg signed [4:0] relativeNextRow;
+		input reg signed [4:0] relativeNextColumn;
 		inout reg reachable;
 		output reg blocked;
 
@@ -129,9 +119,8 @@ module Chess(
 
 	task computeSlidingReachableSquares;
 		input reg [6:0] currSquare;
-		input signed [5:0] rowDirection;
-		input signed [5:0] columnDirection;
-		input[4:0] board [63:0];
+		input reg signed [5:0] rowDirection;
+		input reg signed [5:0] columnDirection;
 		inout reg [63:0] reachable;
 
 		reg blocked; // 1 if true, 0 if false
@@ -149,7 +138,7 @@ module Chess(
 
 
 	task canReachVerticallyHorizontally;
-		input [6:0] currSquare;
+		input reg [6:0] currSquare;
 		output reg [63:0] reachable;
 		
 		begin
@@ -162,7 +151,7 @@ module Chess(
 
 
 	task canReachDiagonally;
-		input [6:0] currSquare;
+		input reg [6:0] currSquare;
 		output reg [63:0] reachable;
 		
 		begin
@@ -193,7 +182,7 @@ module Chess(
 
 	// knight and pawn are the only pieces that have unique logic, and king for castling
 	task pawnCanReach;
-		input[5:0] currSquare;
+		input reg [5:0] currSquare;
 		inout reg [63:0] reachable;
 		
 		reg signed [4:0] currRow;
@@ -238,7 +227,7 @@ module Chess(
 
 
 	task computeReachableSquares;
-		input[5:0] currSquare;
+		input reg [5:0] currSquare;
 		output reg [63:0] reachable;
 
 		reg [4:0] pieceType;
@@ -265,10 +254,10 @@ module Chess(
 	// isCheck logic
 	
 	task getFirstPieceInDirection;
-		input[5:0] currSquare;
-		input signed [5:0] rowDirection;
-		input signed [5:0] columnDirection;
-		input isBlackTurn;
+		input reg [5:0] currSquare;
+		input reg signed [5:0] rowDirection;
+		input reg signed [5:0] columnDirection;
+		input reg isBlackTurn;
 		inout reg isAttacked;
 
 		reg signed [4:0] i;
@@ -308,9 +297,9 @@ module Chess(
 
 
 	task getPieceByFixedOffset;
-		input[5:0] currSquare;
-		input signed [5:0] rowDirection;
-		input signed [5:0] columnDirection;
+		input reg [5:0] currSquare;
+		input reg signed [5:0] rowDirection;
+		input reg signed [5:0] columnDirection;
 		input reg [4:0] attackingPieceType;
 		output reg isAttacked;
 
@@ -328,7 +317,7 @@ module Chess(
 
 
 	task findKing;
-		input isBlackTurn;
+		input reg isBlackTurn;
 		output reg[5:0] kingSquare;
 		output reg kingFound;
 
@@ -348,7 +337,7 @@ module Chess(
 
 	// brute force check all squares that attackers can reach the king square
 	task isChecked;
-		input isBlackTurn;
+		input reg isBlackTurn;
 		output reg checked;
 		
 		reg [5:0] kingSquare;
@@ -414,14 +403,13 @@ module Chess(
 	
 	// checks if a move, if allowed, exposes or doesn't defend a checked king
 	task doesKingStaySafe;
-		input[5:0] currSquare;
-		input[5:0] targetSquare;
+		input reg [5:0] currSquare;
+		input reg [5:0] targetSquare;
 		output reg isSafeMove;
 
 		reg [4:0] movedPiece;
 		reg [4:0] capturedPiece;
 		reg isWhite;
-		reg isChecked;
 
 		begin
 			movedPiece = board[currSquare];
@@ -439,11 +427,11 @@ module Chess(
 
 
 	task computeLegalMoves;
-		input [5:0] currSquare;
-		output reg[63:0] legalMoves;
+		input reg [5:0] currSquare;
+		output reg [63:0] legalMoves;
 
-		reg[63:0] reachable;
-		reg[6:0] i;
+		reg [63:0] reachable;
+		reg [6:0] i;
 		reg isSafeMove;
 
 		begin
@@ -465,10 +453,10 @@ module Chess(
 	// checkmate and stalemate logic
 
 	task hasLegalMoves
-		input isBlackMove;
+		input reg isBlackMove;
 		output reg hasAnyLegal;
 
-		reg[6:0] i;
+		reg [6:0] i;
 		reg [63:0] legalMoves;
 
 		begin : checkForMoves
@@ -491,7 +479,7 @@ module Chess(
 	endtask
 
 	task isCheckmate
-		input isBlackMove;
+		input reg isBlackMove;
 		output reg checkmate;
 
 		reg inCheck;
@@ -510,7 +498,7 @@ module Chess(
 	endtask
 
 	task isStalemate
-		input isBlackMove;
+		input reg isBlackMove;
 		output reg stalemate;
 
 		reg inCheck;
@@ -529,35 +517,78 @@ module Chess(
 	endtask
 
 	// -----------------------------------------------------------------------------------------------------------------
-	
+
+	reg [6:0] currSquare;
+	reg [2:0] currRow;
+	reg [2:0] currColumn;
+
+	reg [6:0] nextSquare;
+	reg [2:0] nextRow;
+	reg [2:0] nextColumn;
+
+	reg previousSelect;
+	reg pieceIsSelected;
+	reg nextSelect; // toggles between specifying currSquare and nextSquare
+
+	reg [63:0] legalMoves;
+	reg isBlackMove;
+
+	reg [25:0] clockDivider = 0;
+	reg [9:0] player1Timer;
+	reg [9:0] player2Timer;
+	wire hold = SW[6];
+	reg holdPosition;
+
+	reg checkmate;
+	reg stalemate;
+	reg gameEnd;
+
 	always @(posedge clock) begin
-			if (select)
+		previousSelect <= select;
 		
+		if (holdPosition || hold || gameEnd)
+
+		else if (select && !previousSelect)
+			pieceIsSelect = !pieceIsSelect;
 		
+		else if (pieceIsSelected && !(select && !previousSelect) && nextSelect) begin
+			nextRow <= 1 * SW[0] + 2 * SW[1] + 4 * SW[2];
+			nextColumn <= 1 * SW[3] + 2 * SW[4] + 4 * SW[5];
+			
+			if (isInsideBoard(nextRow) && isInsideBoard(nextColumn)) begin
+				nextSquare <= nextColumn * 8 + nextRow;
+				computeLegalMoves(currSquare legalMoves);
+
+				if (legalMoves[nextSquare] != 0) begin
+					board[nextSquare] <= board[currSquare];
+					board[currSquare] <= 5'd0;
+
+					isCheckmate(isBlackMove, checkmate);
+					isStalemate(isBlackMove, stalemate);
+					if (checkmate || stalemate) gameEnd <= 1'b1;
+				end
+
+				nextSelect <= ~nextSelect;
+			end
+
+		else if (pieceIsSelected && !(select && !previousSelect)) begin
+			currRow <= 1 * SW[0] + 2 * SW[1] + 4 * SW[2];
+			currColumn <= 1 * SW[3] + 2 * SW[4] + 4 * SW[5];
+			
+			if (isInsideBoard(currRow) && isInsideBoard(currColumn)) begin
+				currSquare <= column * 8 + row;
+				nextSelect <= 1'b1;
+			end
+		
+		else if (player1Timer == 0 || player2Timer == 0)
+			gameEnd <= 1'b1;
+	
+		else if (clockDivider >= 50000000)
+			 if (isBlackMove) player2Timer <= player2Timer - 1;
+			 else player1Timer <= player1Timer - 1;
+			 clockDivider <= 0;
+		end
+
+		else clockDivider <= clockDivider + 1;
+	end
 endmodule
-
-task computePinnedPieces(
-);
-endtask
-
-/*
-	I differentiate "possible" from "legal" because computing "legal" entails:
-		- Making sure the piece isn't pinned
-		- Making sure the king isn't in check
-	These require computing other piece's moves, as opposed to "possible" that only need their positions
-*/
-task computePossibleMoves
-	input clock;
-	input select;
-	output reg [4:0] chessBoard [63:0];
-endtask
-
-task isChecked(
-);
-
-endtask
-
-task isCheckmate(
-);
-
-endtask
