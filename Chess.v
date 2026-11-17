@@ -71,6 +71,12 @@ module Chess(
 		end
 	endtask
 	
+	function isInsideBoard;
+		input reg signed [5:0] boardDimension;
+		begin
+			 isInsideBoard = (boardDimension >= 0 && boardDimension < 64);
+		end
+	endfunction
 
 	task clearReachableSquares;
 		output reg [63:0] reachable;
@@ -104,7 +110,7 @@ module Chess(
 			nextColumn = currSquareColumn + relativeNextColumn;
 			nextRow = nextRow + relativeNextRow;
 
-			if (nextRow >= 0 && nextRow < 8 && nextColumn >= 0 && nextColumn < 8) begin
+			if (isInsideBoard(nextRow) && isInsideBoard(nextColumn)) begin
 				nextSquare = nextColumn * 8 + nextRow;
 
 				if (board[nextSquare] == 5'd0) reachable[nextSquare] = 1'b1;
@@ -168,52 +174,16 @@ module Chess(
 		input reg [6:0] currSquare;
 		output reg [63:0] reachable;
 		
-		reg signed [8:0] nextSquare;
-
+		reg dummyReg;
 		begin
-			reg signed[3:0] currSquareRow = currSquare % 8;
-			reg signed[3:0] currSquareColumn = currSquare / 8;
-			reg isWhite = (board[currSquare] <= 6);
-
-			nextSquare = currSquare + 10;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
-				nextSquare / 8 - currSquareColumn == 1 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare + 17;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
-				nextSquare / 8 - currSquareColumn == 2 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare + 15;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
-				nextSquare / 8 - currSquareColumn == 2 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare + 6;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
-				nextSquare / 8 - currSquareColumn == 1 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare - 10;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -2 &&
-				nextSquare / 8 - currSquareColumn == -1 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare - 17;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == -1 &&
-				nextSquare / 8 - currSquareColumn == -2 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare - 15;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 1 &&
-				nextSquare / 8 - currSquareColumn == -2 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
-
-			nextSquare = currSquare - 6;
-			if (nextSquare >= 0 && nextSquare < 64 && (nextSquare % 8 - currSquareRow) == 2 &&
-				nextSquare / 8 - currSquareColumn == -1 && (board[nextSquare] <= 5'd6) != isWhite)
-				reachable[nextSquare] = 1'b1;
+			canLandOnSquare(currSquare,  2,  1, reachable, dummyReg);
+			canLandOnSquare(currSquare,  2, -1, reachable, dummyReg);
+			canLandOnSquare(currSquare, -2,  1, reachable, dummyReg);
+			canLandOnSquare(currSquare, -2, -1, reachable, dummyReg);
+			canLandOnSquare(currSquare,  1,  2, reachable, dummyReg);
+			canLandOnSquare(currSquare,  1, -2, reachable, dummyReg);
+			canLandOnSquare(currSquare, -1,  2, reachable, dummyReg);
+			canLandOnSquare(currSquare, -1, -2, reachable, dummyReg);	
 		end
 	endtask
 
@@ -240,7 +210,7 @@ module Chess(
 			startingColumn = isWhite ? 1 : 6;
 			nextColumn = currRow + forwardDirection;
 
-			if (nextColumn >= 0 && nextColumn < 8) begin
+			if (isInsideBoard(nextColumn)) begin
 				nextSquare = currSquare + nextColumn * 8;
 
 				if (board[nextSquare] == 5'd0) begin
@@ -254,7 +224,7 @@ module Chess(
 
 				for (diagonalSquareRow = -1; diagonalSquareRow <= 1; diagonalSquareRow = diagonalSquareRow + 2) begin
 					nextRow = currRow + diagonalSquareRow;
-					if (nextRow >= 0 && nextRow < 8 && (board[nextColumn * 8 + nextRow] <= 5'd6) != isWhite)
+					if (isInsideBoard(nextRow) && (board[nextColumn * 8 + nextRow] <= 5'd6) != isWhite)
 						reachable[nextColumn * 8 + nextRow] == 1'b1;
 					end
 				end
