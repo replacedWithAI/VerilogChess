@@ -1,19 +1,68 @@
-module translateSWToDigit();
-
+module displayRowAndColumn( // might delete this later when the VGA works
+	input [2:0] value,
+	input isRow,
+	output reg [6:0] display
+);
+	always @(*) begin
+		case(value)
+			case (value)
+			3'd0: display = isRow ? 7'b0001000 : 7'b1111001;
+			3'd1: display = isRow ? 7'b0000000 : 7'b0100100;
+			3'd2: display = isRow ?	7'b1000110 : 7'b0110000;
+			3'd3: display = isRow ? 7'b0100001 : 7'b0011001;
+			3'd4: display = isRow ? 7'b0000110 : 7'b0010010;
+			3'd5: display = isRow ? 7'b0001110 : 7'b0000010;
+			3'd6: display = isRow ? 7'b0010000 : 7'b1111000;
+			3'd7: display = isRow ? 7'b0001101 : 7'b0000000;
+			default: ;
+		endcase
+	end
 endmodule
 
+module displayPiece(
+	input [3:0] value;
+	output reg [6:0] display;
+);
+	always @(*) begin
+		case(value)
+			5'd1, 5'd7: display = 7'b0001100;
+			5'd2, 5'd8: display = 7'b0101111;
+			5'd3, 5'd9: display = 7'b0101011;
+			5'd4, 5'd10: display = 7'b0000011;
+			5'd5, 5'd11: display = 7'b0011000;
+			5'd6, 5'd12: display = 7'b0001000;
+			default: display = 7'b1111111;
+		endcase
+	end
+endmodule
+
+module displayTurn(
+	input value,
+	output reg[6:0] display
+);
+	always @(*) begin
+		1'b0: display = 7'b1111001;
+		1'b1: display = 7'b0100100;
+	end
+endmodule
 
 module Chess(
 	input [6:0] SW,
 	input clock,
 	input reset,
 	input select
+	output wire [6:0] hex0Display,
+	output wire [6:0] hex1Display,
+	output wire [6:0] hex2Display,
+	output wire [6:0] hex3Display,
+	output wire [6:0] hex4Display,
+	output wire [6:0] hex5Display,
 );
 	reg [4:0] board[63:0];
 
-	function isInsideBoard;
+	function isInsideBoard; // might be redundant. Any number bigger than 7 is truncated
 		input reg signed [5:0] boardDimension;
-		begin
+		beginwire [6:0] currSquare = ;
 			 isInsideBoard = (boardDimension >= 0 && boardDimension < 8);
 		end
 	endfunction
@@ -563,6 +612,7 @@ module Chess(
 	reg [2:0] nextRow = 3'b0;
 	reg [2:0] nextColumn = 3'b0;
 
+	wire [3:0] hoveredPiece = pieceIsSelected ? board[nextSquare] : board[currSquare];
 	reg previousSelect = 1'b0;
 	reg pieceIsSelected = 1'b0; // toggles between specifying currSquare and nextSquare
 
@@ -665,4 +715,10 @@ module Chess(
 			end
 		end
 	end
+	displayRowAndColumn nextColumn (.value(nextColumn), .display(hex0Display));
+	displayRowAndColumn nextRow (.value(nextRow), .display(hex1Display));
+	displayRowAndColumn currColumnDisplay(.value(currRow), .display(hex2Display));
+	displayRowAndColumn currRowDisplay(.value(currColumn), .display(hex3Display));
+	displayPiece piece(.value(hoveredPiece), .display(hex4Display));
+	displayTurn turn(.value(isBlackMove), .display(hex5Display));
 endmodule
