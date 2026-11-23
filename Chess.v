@@ -5,7 +5,6 @@ module displayRowAndColumn( // might delete this later when the VGA works
 );
 	always @(*) begin
 		case(value)
-			case (value)
 			3'd0: display = isRow ? 7'b0001000 : 7'b1111001;
 			3'd1: display = isRow ? 7'b0000000 : 7'b0100100;
 			3'd2: display = isRow ?	7'b1000110 : 7'b0110000;
@@ -14,14 +13,14 @@ module displayRowAndColumn( // might delete this later when the VGA works
 			3'd5: display = isRow ? 7'b0001110 : 7'b0000010;
 			3'd6: display = isRow ? 7'b0010000 : 7'b1111000;
 			3'd7: display = isRow ? 7'b0001101 : 7'b0000000;
-			default: ;
+			default: display = 7'b1111111;
 		endcase
 	end
 endmodule
 
 module displayPiece(
-	input [3:0] value;
-	output reg [6:0] display;
+	input [3:0] value,
+	output reg [6:0] display
 );
 	always @(*) begin
 		case(value)
@@ -41,8 +40,10 @@ module displayTurn(
 	output reg[6:0] display
 );
 	always @(*) begin
-		1'b0: display = 7'b1111001;
-		1'b1: display = 7'b0100100;
+		case(value)
+			1'b0: display = 7'b1111001;
+			1'b1: display = 7'b0100100;
+		endcase
 	end
 endmodule
 
@@ -50,19 +51,19 @@ module Chess(
 	input [6:0] SW,
 	input clock,
 	input reset,
-	input select
+	input select,
 	output wire [6:0] hex0Display,
 	output wire [6:0] hex1Display,
 	output wire [6:0] hex2Display,
 	output wire [6:0] hex3Display,
 	output wire [6:0] hex4Display,
-	output wire [6:0] hex5Display,
+	output wire [6:0] hex5Display
 );
 	reg [4:0] board[63:0];
 
 	function isInsideBoard; // might be redundant. Any number bigger than 7 is truncated
 		input reg signed [5:0] boardDimension;
-		beginwire [6:0] currSquare = ;
+		begin
 			 isInsideBoard = (boardDimension >= 0 && boardDimension < 8);
 		end
 	endfunction
@@ -494,7 +495,7 @@ module Chess(
 		reg [4:0] movedPiece;
 		reg [4:0] capturedPiece;
 		reg isWhite;
-		reg checked;
+		reg kingIsChecked;
 
 		begin
 			movedPiece = board[currSquare];
@@ -503,8 +504,8 @@ module Chess(
 
 			board[targetSquare] = board[currSquare];
 			board[currSquare] = 5'd0;
-			isChecked(!isWhite, checked);
-			isSafeMove = !checked;
+			isChecked(!isWhite, kingIsChecked);
+			isSafeMove = !kingIsChecked;
 
 			board[currSquare] = movedPiece;
 			board[targetSquare] = capturedPiece;
@@ -603,18 +604,9 @@ module Chess(
 	endtask
 
 	// -----------------------------------------------------------------------------------------------------------------
-
-	reg [6:0] currSquare = 7'b0;
-	reg [2:0] currRow = 3'b0;
-	reg [2:0] currColumn = 3'b0;
-
-	reg [6:0] nextSquare = 7'b0;
-	reg [2:0] nextRow = 3'b0;
-	reg [2:0] nextColumn = 3'b0;
-
-	wire [3:0] hoveredPiece = pieceIsSelected ? board[nextSquare] : board[currSquare];
 	reg previousSelect = 1'b0;
 	reg pieceIsSelected = 1'b0; // toggles between specifying currSquare and nextSquare
+	wire [3:0] hoveredPiece = pieceIsSelected ? board[nextSquare] : board[currSquare];
 
 	reg [63:0] legalMoves;
 	reg isBlackMove = 1'b0;
@@ -625,12 +617,21 @@ module Chess(
 	wire hold = SW[6];
 	reg holdPosition = 1'b0; // might delete later; not used rn
 
+	wire [6:0] currSquare = currColumn * 8 + currRow;
+	wire [2:0] currRow = !pieceIsSelected ? 1 * SW[0] + 2 * SW[1] + 4 * SW[2] : 3'b0;
+	wire [2:0] currColumn = !pieceIsSelected ? 1 * SW[3] + 2 * SW[4] + 4 * SW[5] : 3'd0;
+
+	wire [6:0] nextSquare = nextColumn * 8 + nextRow;
+	wire [2:0] nextRow = pieceIsSelected ? 1 * SW[0] + 2 * SW[1] + 4 * SW[2] : 3'b0;
+	wire [2:0] nextColumn = pieceIsSelected ? 1 * SW[3] + 2 * SW[4] + 4 * SW[5] : 3'd0;
+
 	reg checkmate = 1'b0;
 	reg stalemate = 1'b0;
 	reg gameEnd = 1'b0;
-
+	
+	initial initialiseBoard();
 	always @(posedge clock) begin
-		if (reset) begin
+		if (reset) begin // not sure how this works for nextDimension
 			initialiseBoard();
 			player1Timer <= 10'd600;
 			player2Timer <= 10'd600;
@@ -638,12 +639,6 @@ module Chess(
 			isBlackMove <= 1'b0;
 			previousSelect <= 1'b0;
 			pieceIsSelected <= 1'b0;
-			currSquare <= 7'b0;
-			currRow <= 3'b0;
-			currColumn <= 3'b0;
-			nextSquare <= 7'b0;
-			nextRow <= 3'b0;
-			nextColumn <= 3'b0;
 			checkmate <= 1'b0;
 			stalemate <= 1'b0;
 			gameEnd <= 1'b0;
@@ -658,16 +653,8 @@ module Chess(
 					
 				
 					if (pieceIsSelected) begin
-						nextRow = 1 * SW[0] + 2 * SW[1] + 4 * SW[2];
-						nextColumn = 1 * SW[3] + 2 * SW[4] + 4 * SW[5];
-						nextSquare = nextColumn * 8 + nextRow;
-						
-						if (nextRow == currRow && nextColumn == currColumn) begin
-							nextRow = 3'd0;
-							nextColumn = 3'd0;
-							nextSquare = 6'b0;
-							pieceIsSelected = 1'b0;
-						end
+						if (nextRow == currRow && nextColumn == currColumn)
+							pieceIsSelected <= 1'b0;
 
 						else if (isInsideBoard(nextRow) && isInsideBoard(nextColumn) && 
 								(board[nextSquare] == 5'd0 || isWhitePiece(nextSquare) == isBlackMove)) begin
@@ -688,13 +675,9 @@ module Chess(
 					end
 
 					else begin
-						currRow = 1 * SW[0] + 2 * SW[1] + 4 * SW[2];
-						currColumn = 1 * SW[3] + 2 * SW[4] + 4 * SW[5];
-						currSquare = currColumn * 8 + currRow;
-						
 						if (isInsideBoard(currRow) && isInsideBoard(currColumn) && 
 							(board[currSquare] != 5'd0 && isWhitePiece(currSquare) != isBlackMove)) begin
-							pieceIsSelected = 1'b1;
+							pieceIsSelected <= 1'b1;
 						end
 							
 					end
@@ -715,10 +698,10 @@ module Chess(
 			end
 		end
 	end
-	displayRowAndColumn nextColumn (.value(nextColumn), .display(hex0Display));
-	displayRowAndColumn nextRow (.value(nextRow), .display(hex1Display));
-	displayRowAndColumn currColumnDisplay(.value(currRow), .display(hex2Display));
-	displayRowAndColumn currRowDisplay(.value(currColumn), .display(hex3Display));
+	displayRowAndColumn nextColumnDisplay (.value(nextColumn), .isRow(1'b0), .display(hex0Display));
+	displayRowAndColumn nextRowDisplay (.value(nextRow), .isRow(1'b1), .display(hex1Display));
+	displayRowAndColumn currColumnDisplay(.value(currColumn), .isRow(1'b0), .display(hex2Display));
+	displayRowAndColumn currRowDisplay(.value(currRow), .isRow(1'b1), .display(hex3Display));
 	displayPiece piece(.value(hoveredPiece), .display(hex4Display));
 	displayTurn turn(.value(isBlackMove), .display(hex5Display));
 endmodule
