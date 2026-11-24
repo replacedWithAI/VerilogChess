@@ -12,7 +12,7 @@ module displayRowAndColumn( // might delete this later when the VGA works
 			3'd4: display = isRow ? 7'b0000110 : 7'b0010010;
 			3'd5: display = isRow ? 7'b0001110 : 7'b0000010;
 			3'd6: display = isRow ? 7'b0010000 : 7'b1111000;
-			3'd7: display = isRow ? 7'b0001101 : 7'b0000000;
+			3'd7: display = isRow ? 7'b0001011 : 7'b0000000;
 			default: display = 7'b1111111;
 		endcase
 	end
@@ -29,7 +29,7 @@ module displayPiece(
 			5'd3, 5'd9: display = 7'b0101011;
 			5'd4, 5'd10: display = 7'b0000011;
 			5'd5, 5'd11: display = 7'b0011000;
-			5'd6, 5'd12: display = 7'b0001000;
+			5'd6, 5'd12: display = 7'b0001001;
 			default: display = 7'b1111111;
 		endcase
 	end
@@ -60,6 +60,23 @@ module Chess(
 	output wire [6:0] hex5Display
 );
 	reg [4:0] board[63:0];
+
+	reg simActive = 1'b0;
+	reg [5:0] simFrom = 6'd0;
+	reg [5:0] simTo = 6'd0;
+	reg [4:0] simPiece = 5'd0;
+
+	function [4:0] effBoard; // I write to board with non-blocked assignments, so I need a function that gives immediate updates
+		input [5:0] square;
+		begin
+			if (simActive && square == simTo)
+				effBoard = simPiece;
+			else if (simActive && square == simFrom)
+				effBoard = 5'd0;
+			else
+				effBoard = board[square];
+		end
+	endfunction
 
 	function isInsideBoard; // might be redundant. Any number bigger than 7 is truncated
 		input reg signed [5:0] boardDimension;
@@ -96,35 +113,35 @@ module Chess(
 		reg [3:0] j;
 
 		begin
-			board[0] = 5'd2;
-			board[1] = 5'd3;
-			board[2] = 5'd4;
-			board[3] = 5'd5;
-			board[4] = 5'd6;
-			board[5] = 5'd4;
-			board[6] = 5'd3;
-			board[7] = 5'd2;
+			board[0] <= 5'd2;
+			board[1] <= 5'd3;
+			board[2] <= 5'd4;
+			board[3] <= 5'd5;
+			board[4] <= 5'd6;
+			board[5] <= 5'd4;
+			board[6] <= 5'd3;
+			board[7] <= 5'd2;
 			
 			for (i = 0; i < 8; i = i + 1) begin
-				board[i + 8] = 5'd1;
+				board[i + 8] <= 5'd1;
 			end
 			
 			for (i = 0; i < 8; i = i + 1) begin
-				board[i + 48] = 5'd7;
+				board[i + 48] <= 5'd7;
 			end
 			
-			board[56] = 5'd8;
-			board[57] = 5'd9;
-			board[58] = 5'd10;
-			board[59] = 5'd11;
-			board[60] = 5'd12;
-			board[61] = 5'd10;
-			board[62] = 5'd9;
-			board[63] = 5'd8;
+			board[56] <= 5'd8;
+			board[57] <= 5'd9;
+			board[58] <= 5'd10;
+			board[59] <= 5'd11;
+			board[60] <= 5'd12;
+			board[61] <= 5'd10;
+			board[62] <= 5'd9;
+			board[63] <= 5'd8;
 					
 			for (i = 2; i < 6; i = i + 1) begin
 				for (j = 0; j < 8; j = j + 1) begin
-					board[i * 8 + j] = 5'd0;
+					board[i * 8 + j] <= 5'd0;
 				end
 			end
 		end
@@ -356,6 +373,7 @@ module Chess(
 		reg signed [4:0] nextColumn;
 		reg [4:0] piece;
 		reg [4:0] pieceType;
+		reg [4:0] squarePiece;
 		reg isDiagonal;
 
 		begin
@@ -367,8 +385,11 @@ module Chess(
 				nextRow = currRow + i * rowDirection;
 				nextColumn = currColumn + i * columnDirection;
 
-				if (piece == 5'd0 && isInsideBoard(nextRow) && isInsideBoard(nextColumn) && board[nextColumn * 8 + nextRow] != 5'd0)
-					piece = board[nextColumn * 8 + nextRow];
+				if (piece == 5'd0 && isInsideBoard(nextRow) && isInsideBoard(nextColumn)) begin
+					squarePiece = effBoard(nextColumn * 8 + nextRow);
+					if (squarePiece != 5'd0)
+						piece = squarePiece;
+				end
 			end
 
 			if (piece != 5'd0 && (piece >= 5'd1 && piece <= 5'd6) == whiteIsAttacking) begin
@@ -395,7 +416,7 @@ module Chess(
 			nextRow = currSquare % 8 + rowDirection;
 			nextColumn = currSquare / 8 + columnDirection;
 
-			if (isInsideBoard(nextRow) && isInsideBoard(nextColumn) && board[nextColumn * 8 + nextRow] == attackingPieceType)
+			if (isInsideBoard(nextRow) && isInsideBoard(nextColumn) && effBoard(nextColumn * 8 + nextRow) == attackingPieceType)
 				isAttacked = 1'b1;
 		end
 	endtask
@@ -410,12 +431,13 @@ module Chess(
 		reg [4:0] kingPiece;
 
 		begin
-			kingFound = 1'b0;
-			kingPiece = isBlackTurn ? 5'd12 : 5'd6;
+			kingFound  = 1'b0;
+			kingSquare = 6'd0;
+			kingPiece  = isBlackTurn ? 5'd12 : 5'd6;
 			for (i = 0; i < 64; i = i + 1) begin
-				if (board[i] == kingPiece) begin
+				if (effBoard(i) == kingPiece) begin
 					kingSquare = i;
-					kingFound = 1'b1;
+					kingFound  = 1'b1;
 				end
 			end
 		end
@@ -484,224 +506,230 @@ module Chess(
 	endtask
 
 	// -----------------------------------------------------------------------------------------------------------------
-	// legal moves logic
-	
-	// checks if a move, if allowed, exposes or doesn't defend a checked king
-	task doesKingStaySafe;
-		input reg [5:0] currSquare;
-		input reg [5:0] targetSquare;
-		output reg isSafeMove;
 
-		reg [4:0] movedPiece;
-		reg [4:0] capturedPiece;
-		reg isWhite;
-		reg kingIsChecked;
-
-		begin
-			movedPiece = board[currSquare];
-			capturedPiece = board[targetSquare];
-			isWhite = (movedPiece >= 5'd1 && movedPiece <= 5'd6);
-
-			board[targetSquare] = board[currSquare];
-			board[currSquare] = 5'd0;
-			isChecked(!isWhite, kingIsChecked);
-			isSafeMove = !kingIsChecked;
-
-			board[currSquare] = movedPiece;
-			board[targetSquare] = capturedPiece;
-		end
-	endtask
-
-
-	task computeLegalMoves;
-		input reg [5:0] currSquare;
-		output reg [63:0] legalMoves;
-
-		reg [63:0] reachable;
-		reg [6:0] i;
-		reg isSafeMove;
-
-		begin
-			computeReachableSquares(currSquare, reachable);
-			legalMoves = 64'b0;
-
-			for (i = 0; i < 64; i = i + 1) begin
-				
-				if(reachable[i]) begin
-					doesKingStaySafe(currSquare, i, isSafeMove);
-					legalMoves[i] = isSafeMove;
-				end
-			
-			end
-		end
-	endtask
-
-	// -----------------------------------------------------------------------------------------------------------------
-	// checkmate and stalemate logic
-
-	task hasLegalMoves;
-		input reg isBlackMove;
-		output reg hasAnyLegal;
-
-		reg [6:0] i;
-		reg [63:0] legalMoves;
-
-		begin : checkForMoves
-			hasAnyLegal = 1'b0;
-
-			for (i = 0; i < 64; i = i + 1) begin
-
-				if (board[i] != 5'd0 && (board[i] >= 5'd7 && board[i] <= 5'd12) == isBlackMove) begin
-					computeLegalMoves(i, legalMoves);
-
-					if (legalMoves != 64'b0) begin
-						hasAnyLegal = 1'b1;
-						disable checkForMoves;
-					end
-					
-				end
-
-			end
-		end
-	endtask
-
-	task isCheckmate;
-		input reg isBlackMove;
-		output reg checkmate;
-
-		reg inCheck;
-		reg hasAnyLegal;
-
-		begin
-			checkmate = 1'b0;
-
-			isChecked(!isBlackMove, inCheck);
-			if (inCheck) begin
-				hasLegalMoves(!isBlackMove, hasAnyLegal);
-				checkmate = !hasAnyLegal;
-			end
-		
-		end
-	endtask
-
-	task isStalemate;
-		input reg isBlackMove;
-		output reg stalemate;
-
-		reg inCheck;
-		reg hasAnyLegal;
-
-		begin
-			stalemate = 1'b0;
-			
-			isChecked(!isBlackMove, inCheck);
-			if (!inCheck) begin
-				hasLegalMoves(!isBlackMove, hasAnyLegal);
-				stalemate = !hasAnyLegal;
-			end
-
-		end
-	endtask
-
-	// -----------------------------------------------------------------------------------------------------------------
+	reg [2:0] state = 3'd1;
+	wire selectIsPressed = !select;
 	reg previousSelect = 1'b0;
-	reg pieceIsSelected = 1'b0; // toggles between specifying currSquare and nextSquare
-	wire [3:0] hoveredPiece = pieceIsSelected ? board[nextSquare] : board[currSquare];
-
-	reg [63:0] legalMoves;
+	wire selectRisingEdge = selectIsPressed && !previousSelect;
+	wire hold = SW[6]; // doable with pin assignment editor, but I'm lazy
+	reg holdPosition = 1'b0; // might delete later; not used rn
+	wire resetIsPressed = !reset;
+	
 	reg isBlackMove = 1'b0;
-
-	reg [25:0] clockDivider = 0;
+	reg [25:0] clockDivider = 26'd0;
 	reg [9:0] player1Timer = 10'd600;
 	reg [9:0] player2Timer = 10'd600;
-	wire hold = SW[6];
-	reg holdPosition = 1'b0; // might delete later; not used rn
 
-	wire [6:0] currSquare = currColumn * 8 + currRow;
-	wire [2:0] currRow = !pieceIsSelected ? 1 * SW[0] + 2 * SW[1] + 4 * SW[2] : 3'b0;
-	wire [2:0] currColumn = !pieceIsSelected ? 1 * SW[3] + 2 * SW[4] + 4 * SW[5] : 3'd0;
+	reg [2:0] currRow = 3'd0;
+	reg [2:0] currColumn = 3'd0;
+	wire [5:0] currSquare = currColumn * 8 + currRow;
 
-	wire [6:0] nextSquare = nextColumn * 8 + nextRow;
-	wire [2:0] nextRow = pieceIsSelected ? 1 * SW[0] + 2 * SW[1] + 4 * SW[2] : 3'b0;
-	wire [2:0] nextColumn = pieceIsSelected ? 1 * SW[3] + 2 * SW[4] + 4 * SW[5] : 3'd0;
+	reg [2:0] nextRow = 3'd0;
+	reg [2:0] nextColumn = 3'd0;
+	wire [5:0] nextSquare = nextColumn * 8 + nextRow;
 
+	wire [2:0] swRow = SW[2:0];
+	wire [2:0] swCol = SW[5:3];
+	wire [5:0] swSquare = swCol * 8 + swRow;
+
+	reg [63:0] currPieceReachableMoves = 64'd0;
+	reg [63:0] legalMoves = 64'd0;
+	reg [63:0] reachSelected;
+	reg [63:0] scannedReachableMoves;
+	reg [5:0] legalMovesIndex = 6'd0;
+	reg [5:0] scanSquare = 6'd0;
+
+	reg statusMode = 1'b0; // complicated; read logic
+	reg inCheck = 1'b0;
 	reg checkmate = 1'b0;
 	reg stalemate = 1'b0;
-	reg gameEnd = 1'b0;
-	
+	reg timeout = 1'b0;
+	wire gameEnd = (checkmate || stalemate || timeout);
+
+	reg isKingChecked;
+	reg opponentInCheck;
+	always @(*) begin
+		isChecked((simPiece >= 5'd7 && simPiece <= 5'd12), isKingChecked);
+		isChecked(!isBlackMove, opponentInCheck);
+	end
+
+	always @(*) begin
+		computeReachableSquares(currSquare, reachSelected);
+		computeReachableSquares(scanSquare, scannedReachableMoves);
+	end
+
 	initial initialiseBoard();
+
 	always @(posedge clock) begin
-		if (reset) begin // not sure how this works for nextDimension
+		if (resetIsPressed) begin
 			initialiseBoard();
+			state <= 3'd1;
 			player1Timer <= 10'd600;
 			player2Timer <= 10'd600;
-			clockDivider <= 1'b0;
+			clockDivider <= 26'd0;
 			isBlackMove <= 1'b0;
 			previousSelect <= 1'b0;
-			pieceIsSelected <= 1'b0;
+			currRow <= 3'd0;
+			currColumn <= 3'd0;
+			nextRow <= 3'd0;
+			nextColumn <= 3'd0;
+			currPieceReachableMoves <= 64'd0;
+			legalMoves <= 64'd0;
+			legalMovesIndex <= 6'd0;
+			scanSquare <= 6'd0;
+			statusMode <= 1'b0;
+			inCheck <= 1'b0;
+			simActive <= 1'b0;
+			simFrom <= 6'd0;
+			simTo <= 6'd0;
+			simPiece <= 5'd0;
 			checkmate <= 1'b0;
 			stalemate <= 1'b0;
-			gameEnd <= 1'b0;
 			holdPosition <= 1'b0;
-		end
+			timeout <= 1'b0;
+		end else begin
+			previousSelect <= selectIsPressed;
 
-		else begin 
-			previousSelect <= select;
-
-			if (!holdPosition && !hold && !gameEnd) begin
-				if (select && !previousSelect) begin
-					
-				
-					if (pieceIsSelected) begin
-						if (nextRow == currRow && nextColumn == currColumn)
-							pieceIsSelected <= 1'b0;
-
-						else if (isInsideBoard(nextRow) && isInsideBoard(nextColumn) && 
-								(board[nextSquare] == 5'd0 || isWhitePiece(nextSquare) == isBlackMove)) begin
-							computeLegalMoves(currSquare, legalMoves);
-
-							if (legalMoves[nextSquare] != 0) begin
-								board[nextSquare] = board[currSquare];
-								board[currSquare] = 5'd0;
-
-								isCheckmate(isBlackMove, checkmate);
-								isStalemate(isBlackMove, stalemate);
-								if (checkmate || stalemate) gameEnd <= 1'b1;
-
-								pieceIsSelected <= 1'b0;
-								isBlackMove <= !isBlackMove;
-							end
+			case (state)
+				3'd1: begin // waiting for piece to select
+					if (!holdPosition && !hold && selectRisingEdge) begin
+						if (board[swSquare] != 5'd0 && (isWhitePiece(swSquare) != isBlackMove)) begin
+							currRow <= swRow;
+							currColumn <= swCol;
+							state <= 3'd2;
 						end
 					end
+				end
 
-					else begin
-						if (isInsideBoard(currRow) && isInsideBoard(currColumn) && 
-							(board[currSquare] != 5'd0 && isWhitePiece(currSquare) != isBlackMove)) begin
-							pieceIsSelected <= 1'b1;
+				3'd2: begin // waiting for destination
+					if (!holdPosition && !hold && selectRisingEdge) begin
+						if (swRow == currRow && swCol == currColumn) begin
+							state <= 3'd1;
+						end else if (board[swSquare] == 5'd0 || (isWhitePiece(swSquare) == isBlackMove)) begin
+							nextRow <= swRow;
+							nextColumn <= swCol;
+							currPieceReachableMoves <= reachSelected;
+							legalMoves <= 64'd0;
+							legalMovesIndex <= 6'd0;
+							statusMode <= 1'b0;
+							simActive <= 1'b1;
+							simFrom <= currSquare;
+							simTo <= 6'd0;
+							simPiece <= board[currSquare];
+							state <= (reachSelected == 64'd0) ? 3'd4 : 3'd3;
 						end
-							
 					end
 				end
-			end
-		
-			if (!holdPosition && !hold && !gameEnd) begin
-				if (player1Timer == 0 || player2Timer == 0) gameEnd <= 1'b1;
 
-				else if (clockDivider >= 49_999_999) begin
-					clockDivider <= 0;
+				3'd3: begin // compute legal moves
+					if (currPieceReachableMoves[legalMovesIndex] && !isKingChecked)
+						legalMoves[legalMovesIndex] <= 1'b1;
 
-					if (isBlackMove) player2Timer <= player2Timer - 1;
-					else player1Timer <= player1Timer - 1;
+					if (legalMovesIndex == 6'd63) begin
+						simActive <= 1'b0;
+						state <= 3'd4;
+					end else begin
+						legalMovesIndex <= legalMovesIndex + 6'd1;
+						simTo <= legalMovesIndex + 6'd1;
+					end
 				end
 
-				else clockDivider <= clockDivider + 1;
+				3'd4: begin // process the move
+					simActive <= 1'b0;
+					if (!statusMode) begin
+						if (legalMoves[nextSquare]) begin // compute moves for current player's turn
+							board[nextSquare] <= board[currSquare];
+							board[currSquare] <= 5'd0;
+							statusMode <= 1'b1;
+							state <= 3'd5;
+						end else begin
+							state <= 3'd2;
+						end
+					end else begin // compute moves for enemy's turn (used in state 6)
+						if (legalMoves != 64'd0) begin // if a legal move exists, let the opponent play
+							isBlackMove <= !isBlackMove;
+							state <= 3'd1;
+						end 
+						else if (scanSquare == 6'd63) begin // if no legal moves, end game
+							isBlackMove <= !isBlackMove;
+							state <= 3'd7;
+						end else begin
+							scanSquare <= scanSquare + 6'd1;
+							state <= 3'd6;
+						end
+					end
+				end
+
+				3'd5: begin
+					inCheck <= opponentInCheck;
+					scanSquare <= 6'd0;
+					state <= 3'd6;
+				end
+
+				3'd6: begin // check for checkmate or stalemate
+
+					// if current square contains an opponent's square,
+					// check if the opponent piece has any legal moves in state 3
+					if (scannedReachableMoves != 64'd0 && 
+						board[scanSquare] != 5'd0 && 
+						((board[scanSquare] >= 5'd7 && board[scanSquare] <= 5'd12) == !isBlackMove) &&
+						scannedReachableMoves != 64'd0) begin
+
+							currPieceReachableMoves <= scannedReachableMoves;
+							legalMoves <= 64'd0;
+							legalMovesIndex <= 6'd0;
+							simActive <= 1'b1;
+							simFrom <= scanSquare;
+							simTo <= 6'd0;
+							simPiece <= board[scanSquare];
+							state <= 3'd3;
+					end else if (scanSquare == 6'd63) begin // edge cases like if last square is empty
+						isBlackMove <= !isBlackMove;
+						state <= 3'd7;
+					end else begin
+						scanSquare <= scanSquare + 6'd1;
+					end
+				end
+
+				3'd7: begin
+					checkmate <= inCheck; // might use for VGA; undecided
+					stalemate <= !inCheck;
+				end
+
+				default: state <= 3'd1;
+			endcase
+
+			if (!holdPosition && !hold && !gameEnd && state != 3'd7) begin
+				if (player1Timer == 10'd0 || player2Timer == 10'd0) begin
+					timeout <= 1'b1;
+					state <= 3'd7;
+				end else if (clockDivider >= 26'd49_999_999) begin
+					clockDivider <= 26'd0;
+					if (isBlackMove)
+						player2Timer <= player2Timer - 10'd1;
+					else
+						player1Timer <= player1Timer - 10'd1;
+				end else begin
+					clockDivider <= clockDivider + 26'd1;
+				end
 			end
 		end
 	end
-	displayRowAndColumn nextColumnDisplay (.value(nextColumn), .isRow(1'b0), .display(hex0Display));
-	displayRowAndColumn nextRowDisplay (.value(nextRow), .isRow(1'b1), .display(hex1Display));
-	displayRowAndColumn currColumnDisplay(.value(currColumn), .isRow(1'b0), .display(hex2Display));
-	displayRowAndColumn currRowDisplay(.value(currRow), .isRow(1'b1), .display(hex3Display));
-	displayPiece piece(.value(hoveredPiece), .display(hex4Display));
-	displayTurn turn(.value(isBlackMove), .display(hex5Display));
+
+	wire pieceIsSelected = (state == 3'd2) ||
+	                       (state == 3'd3) ||
+	                       (state == 3'd4 && !statusMode);
+	wire [2:0] currRowDisplayVal = pieceIsSelected ? currRow : swRow;
+	wire [2:0] currColDisplayVal = pieceIsSelected ? currColumn : swCol;
+	wire [2:0] nextRowDisplayVal = pieceIsSelected ? swRow : 3'd0;
+	wire [2:0] nextColDisplayVal = pieceIsSelected ? swCol : 3'd0;
+	wire [4:0] swPiece = board[swSquare];
+	wire [3:0] hoveredPiece = swPiece[3:0];
+
+	displayRowAndColumn nextColumnDisplay (.value(nextColDisplayVal), .isRow(1'b0), .display(hex0Display));
+	displayRowAndColumn nextRowDisplay (.value(nextRowDisplayVal), .isRow(1'b1), .display(hex1Display));
+	displayRowAndColumn currColumnDisplay (.value(currColDisplayVal), .isRow(1'b0), .display(hex2Display));
+	displayRowAndColumn currRowDisplay (.value(currRowDisplayVal), .isRow(1'b1), .display(hex3Display));
+	displayPiece piece (.value(hoveredPiece), .display(hex4Display));
+	displayTurn turn (.value(isBlackMove), .display(hex5Display));
 endmodule
