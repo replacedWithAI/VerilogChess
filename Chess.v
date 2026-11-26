@@ -511,8 +511,8 @@ module Chess(
 	wire selectIsPressed = !select;
 	reg previousSelect = 1'b0;
 	wire selectRisingEdge = selectIsPressed && !previousSelect;
-	wire hold = SW[6]; // doable with pin assignment editor, but I'm lazy
-	reg holdPosition = 1'b0; // might delete later; not used rn
+	wire hold = SW[6];
+	reg holdPosition = 1'b0;
 	wire resetIsPressed = !reset;
 	
 	reg isBlackMove = 1'b0;
@@ -548,6 +548,23 @@ module Chess(
 
 	reg isKingChecked;
 	reg opponentInCheck;
+
+	reg [9:0] moveHistory [15:0];
+	wire [2:0] movedPieceType = isBlackMove ? board[currSquare] - 5'd6 : board[currSquare];
+	wire [9:0] moveEntry = {isBlackMove, movedPieceType, nextRow, nextColumn};
+	reg [4:0] k;
+
+	wire clock25mhz;
+	ClockTimer timeConfig(
+		.inclk0(clock),
+		.c0(clock25mhz)
+	);
+
+	initial begin
+		for (k = 0; k < 16; k = k + 1)
+			moveHistory[k] <= 10'd0;
+	end
+
 	always @(*) begin
 		isChecked((simPiece >= 5'd7 && simPiece <= 5'd12), isKingChecked);
 		isChecked(!isBlackMove, opponentInCheck);
@@ -560,7 +577,7 @@ module Chess(
 
 	initial initialiseBoard();
 
-	always @(posedge clock) begin
+	always @(posedge clock25mhz) begin
 		if (resetIsPressed) begin
 			initialiseBoard();
 			state <= 3'd1;
@@ -587,6 +604,9 @@ module Chess(
 			stalemate <= 1'b0;
 			holdPosition <= 1'b0;
 			timeout <= 1'b0;
+
+			for (k = 0; k < 16; k = k + 1)
+				moveHistory[k] <= 10'd0;
 		end else begin
 			previousSelect <= selectIsPressed;
 
@@ -606,8 +626,8 @@ module Chess(
 						if (swRow == currRow && swCol == currColumn) begin
 							state <= 3'd1;
 						end else if (board[swSquare] == 5'd0 || (isWhitePiece(swSquare) == isBlackMove)) begin
-							nextRow <= swRow;
 							nextColumn <= swCol;
+							nextRow <= swRow;
 							currPieceReachableMoves <= reachSelected;
 							legalMoves <= 64'd0;
 							legalMovesIndex <= 6'd0;
@@ -637,9 +657,14 @@ module Chess(
 				3'd4: begin // process the move
 					simActive <= 1'b0;
 					if (!statusMode) begin
-						if (legalMoves[nextSquare]) begin // compute moves for current player's turn
+						if (legalMoves[nextSquare]) begin // if destination is legal
 							board[nextSquare] <= board[currSquare];
 							board[currSquare] <= 5'd0;
+
+							for (k = 1; k < 16; k = k + 1)
+								moveHistory[k] <= moveHistory[k-1];
+							moveHistory[0] <= moveEntry;
+
 							statusMode <= 1'b1;
 							state <= 3'd5;
 						end else begin
@@ -703,7 +728,7 @@ module Chess(
 				if (player1Timer == 10'd0 || player2Timer == 10'd0) begin
 					timeout <= 1'b1;
 					state <= 3'd7;
-				end else if (clockDivider >= 26'd49_999_999) begin
+				end else if (clockDivider >= 26'd24999999) begin
 					clockDivider <= 26'd0;
 					if (isBlackMove)
 						player2Timer <= player2Timer - 10'd1;
