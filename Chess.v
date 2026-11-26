@@ -6,7 +6,7 @@ module displayRowAndColumn( // might delete this later when the VGA works
 	always @(*) begin
 		case(value)
 			3'd0: display = isRow ? 7'b0001000 : 7'b1111001;
-			3'd1: display = isRow ? 7'b0000000 : 7'b0100100;
+			3'd1: display = isRow ? 7'b0000011 : 7'b0100100;
 			3'd2: display = isRow ?	7'b1000110 : 7'b0110000;
 			3'd3: display = isRow ? 7'b0100001 : 7'b0011001;
 			3'd4: display = isRow ? 7'b0000110 : 7'b0010010;
@@ -29,7 +29,7 @@ module displayPiece(
 			5'd3, 5'd9: display = 7'b0101011;
 			5'd4, 5'd10: display = 7'b0000011;
 			5'd5, 5'd11: display = 7'b0011000;
-			5'd6, 5'd12: display = 7'b0001001;
+			5'd6, 5'd12: display = 7'b0001010;
 			default: display = 7'b1111111;
 		endcase
 	end
