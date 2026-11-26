@@ -528,8 +528,8 @@ module Chess(
 	reg [2:0] nextColumn = 3'd0;
 	wire [5:0] nextSquare = nextColumn * 8 + nextRow;
 
-	wire [2:0] swRow = SW[2:0];
-	wire [2:0] swCol = SW[5:3];
+	wire [2:0] swRow = SW[5:3];
+	wire [2:0] swCol = SW[2:0];
 	wire [5:0] swSquare = swCol * 8 + swRow;
 
 	reg [63:0] currPieceReachableMoves = 64'd0;
