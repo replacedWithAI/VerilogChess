@@ -47,6 +47,10 @@ module displayTurn(
 	end
 endmodule
 
+	// hex displays
+	// -----------------------------------------------------------------------------------------------------------------
+	// main module initialisation
+
 module Chess(
 	input [6:0] SW,
 	input clock,
@@ -66,7 +70,11 @@ module Chess(
 	reg [5:0] simTo = 6'd0;
 	reg [4:0] simPiece = 5'd0;
 
-	function [4:0] effBoard; // I write to board with non-blocked assignments, so I need a function that gives immediate updates
+	// main module initialisation
+	// -----------------------------------------------------------------------------------------------------------------
+	// helper/utility functions
+
+	function [4:0] effBoard; // simulate a board if a move was made. Invalidate move non-destructively
 		input [5:0] square;
 		begin
 			if (simActive && square == simTo)
@@ -147,8 +155,14 @@ module Chess(
 		end
 	endtask
 	
+	// helper/utility functions
 	// -----------------------------------------------------------------------------------------------------------------
-	// compute squares that pieces can reach. Does not mean the move is "legal" though
+	/*
+	 * compute squares that pieces can reach
+	 * legal and "reachable" moves are different because the first are squares that pieces can move to, 
+	 * (doesn't leave king vulnerable), while the last don't consider that condition
+	 */
+
 
 	task clearReachableSquares;
 		output reg [63:0] reachable;
@@ -263,7 +277,7 @@ module Chess(
 	endtask
 
 
-	task pawnCanReach; // no enpassant and promotion yet
+	task pawnCanReach; // no enpassant and promotion
 		input reg [5:0] currSquare;
 		inout reg [63:0] reachable;
 		
@@ -309,7 +323,7 @@ module Chess(
 
 
 	// knight, pawn, and king are the only pieces that have unique logic. Need manual implementations
-	// Castling not implemented yet
+	// Castling not implemented
 	task kingCanReach;
 		input reg[5:0] currSquare;
 		inout reg [63:0] reachable;
@@ -356,6 +370,7 @@ module Chess(
 		end
 	endtask
 
+	// reachable squares logic. Check the upper divider for how legal and reachable moves differ
 	// -----------------------------------------------------------------------------------------------------------------
 	// isCheck logic
 	
@@ -505,7 +520,9 @@ module Chess(
 		end
 	endtask
 
+	// isCheck logic
 	// -----------------------------------------------------------------------------------------------------------------
+	// main logic, including computing legal moves, game state (checkmate, time), and move input output
 
 	reg [2:0] state = 3'd1;
 	wire selectIsPressed = !select;
@@ -519,6 +536,11 @@ module Chess(
 	reg [25:0] clockDivider = 26'd0;
 	reg [9:0] player1Timer = 10'd600;
 	reg [9:0] player2Timer = 10'd600;
+	wire clock25mhz;
+	ClockTimer timeConfig(
+		.inclk0(clock),
+		.c0(clock25mhz)
+	);
 
 	reg [2:0] currRow = 3'd0;
 	reg [2:0] currColumn = 3'd0;
@@ -554,12 +576,6 @@ module Chess(
 	reg [8:0] blackMoveHistory [7:0];
 	wire [8:0] moveEntry = {movedPieceType, nextRow, nextColumn};
 	reg [3:0] k;
-
-	wire clock25mhz;
-	ClockTimer timeConfig(
-		.inclk0(clock),
-		.c0(clock25mhz)
-	);
 
 	initial begin
 		for (k = 0; k < 8; k = k + 1) begin
@@ -616,7 +632,7 @@ module Chess(
 			previousSelect <= selectIsPressed;
 
 			case (state)
-				3'd1: begin // waiting for piece to select
+				3'd1: begin // waiting for piece to select to move
 					if (!holdPosition && !hold && selectRisingEdge) begin
 						if (board[swSquare] != 5'd0 && (isWhitePiece(swSquare) != isBlackMove)) begin
 							currRow <= swRow;
@@ -629,7 +645,9 @@ module Chess(
 				3'd2: begin // waiting for destination
 					if (!holdPosition && !hold && selectRisingEdge) begin
 						if (swRow == currRow && swCol == currColumn) begin
-							state <= 3'd1;
+							state <= 3'd1; // unselect piece to move
+
+						// process destination and simulate board state if piece was moved
 						end else if (board[swSquare] == 5'd0 || (isWhitePiece(swSquare) == isBlackMove)) begin
 							nextColumn <= swCol;
 							nextRow <= swRow;
@@ -637,7 +655,7 @@ module Chess(
 							legalMoves <= 64'd0;
 							legalMovesIndex <= 6'd0;
 							statusMode <= 1'b0;
-							simActive <= 1'b1;
+							simActive <= 1'b1; // for simulating move
 							simFrom <= currSquare;
 							simTo <= 6'd0;
 							simPiece <= board[currSquare];
@@ -646,22 +664,22 @@ module Chess(
 					end
 				end
 
-				3'd3: begin // compute legal moves
+				3'd3: begin // compute if squares in currPieceReachableMoves are legal for either player
 					if (currPieceReachableMoves[legalMovesIndex] && !isKingChecked)
 						legalMoves[legalMovesIndex] <= 1'b1;
 
-					if (legalMovesIndex == 6'd63) begin
+					if (legalMovesIndex == 6'd63) begin // processed all reachable moves
 						simActive <= 1'b0;
 						state <= 3'd4;
-					end else begin
+					end else begin // not done processing
 						legalMovesIndex <= legalMovesIndex + 6'd1;
 						simTo <= legalMovesIndex + 6'd1;
 					end
 				end
 
-				3'd4: begin // process the move
+				3'd4: begin // use legality to make a decision
 					simActive <= 1'b0;
-					if (!statusMode) begin
+					if (!statusMode) begin // for current player's pieces
 						if (legalMoves[nextSquare]) begin // if destination is legal
 							board[nextSquare] <= board[currSquare];
 							board[currSquare] <= 5'd0;
@@ -678,18 +696,22 @@ module Chess(
 
 							statusMode <= 1'b1;
 							state <= 3'd5;
-						end else begin
+
+						end else begin // current player's move isn't legal; select another dest.
 							state <= 3'd2;
 						end
+
 					end else begin // compute moves for enemy's turn (used in state 6)
 						if (legalMoves != 64'd0) begin // if a legal move exists, let the opponent play
 							isBlackMove <= !isBlackMove;
 							state <= 3'd1;
 						end 
+
 						else if (scanSquare == 6'd63) begin // if no legal moves, end game
 							isBlackMove <= !isBlackMove;
 							state <= 3'd7;
-						end else begin
+
+						end else begin // continue searching for if opponent can move
 							scanSquare <= scanSquare + 6'd1;
 							state <= 3'd6;
 						end
@@ -702,9 +724,9 @@ module Chess(
 					state <= 3'd6;
 				end
 
-				3'd6: begin // check for checkmate or stalemate
+				3'd6: begin // check for checkmate or stalemate for opponent
 
-					// if current square contains an opponent's square,
+					// if searched square contains an opponent's square,
 					// check if the opponent piece has any legal moves in state 3
 					if (scannedReachableMoves != 64'd0 && 
 						board[scanSquare] != 5'd0 && 
@@ -719,10 +741,12 @@ module Chess(
 							simTo <= 6'd0;
 							simPiece <= board[scanSquare];
 							state <= 3'd3;
-					end else if (scanSquare == 6'd63) begin // edge cases like if last square is empty
+
+					end else if (scanSquare == 6'd63) begin // no legal moves for opponent were found. End game
 						isBlackMove <= !isBlackMove;
 						state <= 3'd7;
-					end else begin
+
+					end else begin // continue searching
 						scanSquare <= scanSquare + 6'd1;
 					end
 				end
@@ -735,16 +759,19 @@ module Chess(
 				default: state <= 3'd1;
 			endcase
 
+			// decrement clock
 			if (!holdPosition && !hold && !gameEnd && state != 3'd7) begin
 				if (player1Timer == 10'd0 || player2Timer == 10'd0) begin
 					timeout <= 1'b1;
 					state <= 3'd7;
+
 				end else if (clockDivider >= 26'd24999999) begin
 					clockDivider <= 26'd0;
 					if (isBlackMove)
 						player2Timer <= player2Timer - 10'd1;
 					else
 						player1Timer <= player1Timer - 10'd1;
+						
 				end else begin
 					clockDivider <= clockDivider + 26'd1;
 				end
