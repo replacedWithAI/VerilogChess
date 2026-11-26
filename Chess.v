@@ -548,11 +548,12 @@ module Chess(
 
 	reg isKingChecked;
 	reg opponentInCheck;
-
-	reg [9:0] moveHistory [15:0];
-	wire [2:0] movedPieceType = isBlackMove ? board[currSquare] - 5'd6 : board[currSquare];
-	wire [9:0] moveEntry = {isBlackMove, movedPieceType, nextRow, nextColumn};
-	reg [4:0] k;
+	
+	wire [2:0] movedPieceType = isBlackMove ? (board[currSquare] - 5'd6) : board[currSquare];
+	reg [8:0] whiteMoveHistory [7:0];
+	reg [8:0] blackMoveHistory [7:0];
+	wire [8:0] moveEntry = {movedPieceType, nextRow, nextColumn};
+	reg [3:0] k;
 
 	wire clock25mhz;
 	ClockTimer timeConfig(
@@ -561,8 +562,10 @@ module Chess(
 	);
 
 	initial begin
-		for (k = 0; k < 16; k = k + 1)
-			moveHistory[k] <= 10'd0;
+		for (k = 0; k < 8; k = k + 1) begin
+			whiteMoveHistory[k] <= 9'd0;
+			blackMoveHistory[k] <= 9'd0;
+		end
 	end
 
 	always @(*) begin
@@ -605,8 +608,10 @@ module Chess(
 			holdPosition <= 1'b0;
 			timeout <= 1'b0;
 
-			for (k = 0; k < 16; k = k + 1)
-				moveHistory[k] <= 10'd0;
+			for (k = 0; k < 8; k = k + 1) begin
+				whiteMoveHistory[k] <= 9'd0;
+				blackMoveHistory[k] <= 9'd0;
+			end
 		end else begin
 			previousSelect <= selectIsPressed;
 
@@ -660,10 +665,16 @@ module Chess(
 						if (legalMoves[nextSquare]) begin // if destination is legal
 							board[nextSquare] <= board[currSquare];
 							board[currSquare] <= 5'd0;
-
-							for (k = 1; k < 16; k = k + 1)
-								moveHistory[k] <= moveHistory[k-1];
-							moveHistory[0] <= moveEntry;
+							
+							if (!isBlackMove) begin
+								for (k = 1; k < 8; k = k + 1) begin
+									whiteMoveHistory[k] <= whiteMoveHistory[k-1];
+									blackMoveHistory[k] <= blackMoveHistory[k-1];
+								end
+								whiteMoveHistory[0] <= moveEntry;
+								blackMoveHistory[0] <= 9'd0;
+							end else
+								blackMoveHistory[0] <= moveEntry;
 
 							statusMode <= 1'b1;
 							state <= 3'd5;
